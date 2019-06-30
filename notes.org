@@ -1,0 +1,85 @@
+* summary
+** Linux used in real-time systems (esp. industrial control)
+   simple -> reliability, performance
+   *open source* -> modify/change to adapt to user needs
+   large community, good device support, many tools
+   no vendor lock-in
+   => reduce costs compared to using commercial RTOS 
+** Issues in real time systems
+*** unpredictable latencies
+*** limited support for real-time scheduling
+** Design and Implementation of scheduler based on Resource Reservation
+*** allows to enforce temporal isolation between running tasks
+*** describe genesis, challenge, impl details, API, results
+** approaches
+*** realtime HAL (hypervisor) -> linux runs as low prio task. Example: RTLinux
+*** better preemption + interrupt handling strategies PREEMPT-RT patchset
+*** scheduling and resource mgmt algos
+problems: starvation (no isolation between tasks), not expressed in terms of application requirements
+cgroups can cause scheduling anomalies 
+=> use resource reservation
+** want to be production quality
+** implements CBS, additional parameter D_i relative deadline (for deadline != period)
+** inherits deadlines from blocked tasks to deal with priority inversion (budget is not inherited, future work, multiprocessor BWI)
+** temporal confinement + timing guarrantees only valid if tasks are independent (BWI will limit interferences to communicating tasks)
+** show things work as expected with practical and synthetic applications
+** no affinity control because of complexity
+* algorithm
+** new task state: throttled
+** two variables: q_i (remaining processor time) / d_i (deadline)
+** check if current deadline is usable: q_i < (d_i-t) (Q_i/T_i), else generate new deadline
+** scheduling by EDF
+** deadline inherited from blocked processes
+* paper claims / contributions
+** implement and evaluate a realtime scheduler for Linux
+** overview over realtime approaches with Linux
+** application paper
+* need more motivation
+** interest in Linux (should be clear)
+*** real time can be useful on desktop/workstation (for QoS, video streaming)
+**** fixed priorities don't work well because of starvation (fairness, security)
+**** need scheduler that provides temporal protection: behaviour not affected by other tasks
+* related work
+** HAL -> RTlinux  Yodaiken V. The RTLinux manifesto. Proceedings of the 5th Linux Expo, Raleigh, North Carolina, 
+** PREEMPT_RT, RTDroid
+** deferrable server (cgroup scheduling)
+** other Linux realtime scheduler implementations (not enough consensus to be merged to mainline)
+*** Linux/RK (not maintained anymore)
+*** POSIX SCHED_SPORADIC patch (Faggioli et al.) (discontinued, priority based)
+*** OCERA realtime scheduler based on Reservation (prototype level, no multicore, difficult to port to new kernels)
+    ported to Linux 2.6 by Adaptive Quality of Service Architecture project
+    initially based on CBS, derived work implements more advanced algorithms
+*** LITMUS(RT): testbed for scheduling, extension to linux kernel, not production quality
+*** ExSched: scheduling framework without kernel modifications (core is kernel mod), less efficient
+*** SCHED_SOFTRR, SCHED_ISO
+*** Interactive Realtime Multimedia Applications on Service Orientated Infrastructures
+* key words
+** Resource Reservation paradigm
+** temporal isolation between running tasks
+* research todo
+** alternative OSes for realtime systems (why use Linux? motivation)
+* thoughts
+** long history section somewhat boring?
+   confusing without reading other papers first
+   only interesting if you already know some things
+** no talk about how admission test is implemented?
+** section about userspace API seems short
+* presentation structure
+** some introduction (3min)
+** landscape of realtime solutions / related work / history -> motivate (3min)
+** details on EDF / CBS (including CBS vs Deferred Server) (5min)
+** API+multicore (partioned vs global)
+** evaluation (5min)
+** future work + opinion (4min)
+** end
+* structure (alternative)
+** story (nuclear power planet or w/e)
+** explain algos (why need EDF)
+** explain CBS
+** now compare to other approaches
+** 
+* history
+** HAL: RTLinux, RTAI (Adeos) -> Xenomai
+** for other resources: BFQ/BFQ+
+** LINUX/RK (for resource reservation)
+** SCHED_SPORADIC

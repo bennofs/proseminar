@@ -1,0 +1,141 @@
+\documentclass[aspectratio=1610,xcolor=svgnames]{beamer}
+
+\usetheme{metropolis}
+
+
+\usepackage{appendixnumberbeamer}
+\usepackage{tikz}
+\usepackage[absolute,overlay]{textpos}
+\usepackage{pstricks}
+%\usepackage[texcoord,grid,gridunit=mm,gridcolor=red!10,subgridcolor=green!10]{eso-pic}
+
+\newcommand{\tikzdbg}{%
+  \draw[step=1,color=lightgray] (-7,0) grid (7,7);%
+  \fill[red] (0,0) circle (0.2);%
+}
+
+\title{Deadline scheduling in the Linux kernel}
+\subtitle{Juri Lelli, Claudio Scordino, Luca Abeni and Dario Faggioli}
+\date{July 8, 2019}
+\author{Benno Fünfstück}
+
+\begin{document}
+
+\tikzset{
+  onslide/.code args={<#1>#2}{%
+    \only<#1>{\pgfkeysalso{#2}}% \pgfkeysalso doesn't change the path
+  },
+  temporal/.code args={<#1>#2#3#4}{%
+    \temporal<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}{\pgfkeysalso{#4}}%
+  },
+  hidden/.style = {opacity=0},
+  uncover/.style = {temporal=#1{hidden}{}{}},
+}
+
+\maketitle
+
+\section{Introduction}
+
+\begin{frame}\frametitle{Story: A new coffee machine}
+  \vspace{1cm}
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \includegraphics[width=0.95\textwidth]{coffee.pdf}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      {\Large Components:}
+      \begin{itemize}
+      \item Brewing controller
+      \item User interface controller
+      \item Web interface
+      \end{itemize}
+      \vspace{1cm}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}\frametitle{Linux for real-time}
+  First approach: run Linux as a task in real-time hypervisor
+  \begin{itemize}
+  \item examples: RTAI, RTLinux, Xenomai
+  \item maintenance of HAL and microkernel for real-time
+  \item custom tools and API necessary for real-time part 
+  \end{itemize}
+
+  \pause
+
+  Second approach: make the Linux kernel itself suitable for real-time
+  \begin{itemize}
+  \item PREEMPT\_RT patchset
+  \item<3-> \alert{real-time scheduler}
+  \end{itemize}
+\end{frame}
+
+\section{Design of a realtime scheduler}
+
+\begin{frame}\frametitle{Scheduler requirements}
+  \textit{Predictability:} worst-case behaviour must be apparent
+  \begin{itemize}
+    \item 
+  \end{itemize}
+
+  \textit{Temporal isolation:} other tasks should not negatively affect our task
+\end{frame}
+
+\begin{frame}\frametitle{Two important properties}
+  \begin{itemize}
+    \item Predictability
+    \item Temporal isolation
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Todo}
+  
+  \begin{tikzpicture}
+    \tikzdbg
+    \draw (0,0) -- (4,0) -- (4,4) -- (0,4) -- (0,0);
+  \end{tikzpicture}
+\end{frame}
+
+\section{Evaluation}
+
+\begin{frame}\frametitle{Synthetic workload}
+\end{frame}
+
+\begin{frame}\frametitle{MPlayer on loaded system}
+  \begin{center}
+    \input{./eval-mplayer-cfs.tex}
+  \end{center}
+\end{frame}
+
+\begin{frame}\frametitle{Virtual router}
+  
+\end{frame}
+
+\begin{frame}
+  \frametitle{Conclusion} 
+    Still some work left:
+    \begin{itemize} 
+      \item M-BWI: Multiprocessor Bandwidth Inheritance
+      \item Power aware algorithms (example: GRUB-PA)
+      \item Support cgroups interface
+    \end{itemize}
+
+    Not rocket science, but solid implementation of proven concepts (EDF, CBS)
+    \begin{itemize}
+      \item[\ldots] ready for production use
+      \item[\ldots] upstream in the Linux kernel
+      \item[\ldots] with simple to use API
+    \end{itemize}
+
+    We can run our coffee machine on stock linux! :)
+      
+  \begin{textblock*}{15cm}(10mm,93mm)
+    \footnotesize{Paper: \textit{Deadline Scheduling in the Linux kernel}\hspace{1cm}
+      Presentation: \textit{Benno Fünfstück}}
+  \end{textblock*}
+\end{frame}
+
+\end{document}
+
