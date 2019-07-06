@@ -4,6 +4,7 @@
 
 \usepackage{appendixnumberbeamer}
 \usepackage{tikz}
+\usepackage{varwidth}
 \usepackage[absolute,overlay]{textpos}
 \usepackage{pstricks}
 %\usepackage[texcoord,grid,gridunit=mm,gridcolor=red!10,subgridcolor=green!10]{eso-pic}
@@ -469,12 +470,58 @@
   \end{tikzpicture}
 \end{frame}
 
-\begin{frame}[fragile]\frametitle{API, multicore, shared resources}
+\begin{frame}[fragile]\frametitle{API, shared resources, multicore}
   User level API: two new syscalls \verb|sched_setattr| and \verb|sched_getattr| \\
-  \vspace{1cm}
+  \vspace{0.5cm}
   Shared resources: inherit deadline of blocked task \\
-  \vspace{1cm}
-  Multicore: partitioned (via cpuset) and global supported \\
+  \vspace{0.5cm}
+  \begin{tikzpicture}
+    % draw time axis
+    \draw[->] (-6.1,1) -- (1.2,1) node[below,xshift=-0.4cm]{time in ms};
+    \foreach \x in {0,5} \draw[line width=1.3pt] (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95);
+    \foreach \x in {0,...,6} {
+      \pgfmathsetmacro{\ms}{int(\x*20)};
+      \draw (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95) node[anchor=north]{\ms};
+    }
+    \foreach \x in {0,...,6} {
+      \draw[thin, gray, dashed] (-6+\x*\taskunit,1) -- (-6+\x*\taskunit,4);
+    }
+    \node at (2.2,3.0) {
+        {\begin{varwidth}{\linewidth}\begin{itemize}
+            \item \textbf{\color{green!80!black}{T1}} waits for lock hold by \textbf{T3}
+            \item \textbf{T3} inherits deadline of \textbf{\color{green!80!black}{T1}}
+            \item so \textbf{T3} can preempt \textbf{\color{cyan}{T2}}
+         \end{itemize}\end{varwidth}}
+     };
+
+    % draw the task labels
+    \begin{scope}[anchor=south east, rectangle, xshift=-6cm, minimum height=\taskheight]
+      \node[yshift=1.5cm, label=west:{T3    (40/1000)}] {};
+      \node[yshift=2.5cm, label=west:{T2 (50/100)}] {};
+      \node[yshift=3.5cm, label=west:{T1   (10/40)}] {};
+    \end{scope}
+
+    
+    \begin{scope}[xshift=-6cm, yshift=1.5cm]
+      \task{active}{black}{0}{1};
+      \draw[<-]
+      (1.1*\taskunit, 0.5*\taskheight+0cm) -- (2*\taskunit,-0.4*\taskheight+0cm)
+      node[right] {lock released};
+      \draw[color=alert!40!white,<-,very thick] (2*\taskunit,0.0) -- +(0,0.5cm);%
+    \end{scope}
+
+    \begin{scope}[xshift=-6cm, yshift=2.5cm]
+      \period{5};
+      \task{inactive}{cyan}{0}{1.5};
+      \task{active}{cyan}{1.5}{0.5};
+    \end{scope}
+    \begin{scope}[xshift=-6cm, yshift=3.5cm]
+      \period{2};
+      \task{active}{green!80!black}{1}{0.5};
+    \end{scope}
+  \end{tikzpicture}
+  \\ \vspace{0.5cm}
+  Multicore: partitioned (via cpuset) and global supported
 \end{frame}
 
 
