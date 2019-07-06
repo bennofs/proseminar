@@ -9,10 +9,15 @@
 \usepackage{pstricks}
 %\usepackage[texcoord,grid,gridunit=mm,gridcolor=red!10,subgridcolor=green!10]{eso-pic}
 
+\usetikzlibrary{patterns}
+\usetikzlibrary{shapes}
+\usetikzlibrary{shapes.symbols}
+
 \newcommand{\tikzdbg}{%
   \draw[step=1,color=lightgray] (-7,0) grid (7,7);%
   \fill[red] (0,0) circle (0.2);%
 }
+
 
 \title{Deadline scheduling in the Linux kernel}
 \subtitle{Juri Lelli, Claudio Scordino, Luca Abeni and Dario Faggioli}
@@ -20,6 +25,12 @@
 \author{Benno Fünfstück}
 
 \begin{document}
+
+\pgfmathsetmacro{\taskheight}{0.4cm}
+\pgfmathsetmacro{\taskunit}{0.9}
+\colorlet{brew}{olive}
+\colorlet{ui}{black!80!white}
+\colorlet{web}{teal}
 
 \tikzset{
   onslide/.code args={<#1>#2}{%
@@ -29,7 +40,19 @@
     \temporal<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}{\pgfkeysalso{#4}}%
   },
   hidden/.style = {opacity=0},
-  uncover/.style = {temporal=#1{hidden}{}{}},
+  uncover/.style = {temporal=#1{hidden}{}{hidden}},
+  task inactive/.style = {pattern=north west lines,pattern color=#1!80!white, draw=#1!80!white},
+  task active/.style = {fill=#1,draw=#1},
+}
+
+\newcommand{\task}[4]{%
+  \path[task #1=#2] (#3*\taskunit,0.0) rectangle +(#4*\taskunit, \taskheight+0cm);%
+}
+\newcommand{\period}[1]{%
+  \draw[color=alert,<->,thick] (#1*\taskunit,0.0) -- +(0,0.6cm);%
+}
+\newcommand{\taskstart}[0]{%
+  \draw[color=alert,->,thick] (0,0.0) -- +(0,0.6cm);%
 }
 
 \maketitle
@@ -73,34 +96,410 @@
 
 \section{Design of a realtime scheduler}
 
-\begin{frame}\frametitle{Scheduler requirements}
-  \textit{Predictability:} worst-case behaviour must be apparent
-  \begin{itemize}
-    \item 
-  \end{itemize}
+\begin{frame}\frametitle{Real-time Tasks}
+  Properties of real-time tasks: \textit{runtime}, \textit{deadline} and \textit{period}
 
-  \textit{Temporal isolation:} other tasks should not negatively affect our task
-\end{frame}
+  For our coffee machine:
 
-\begin{frame}\frametitle{Two important properties}
-  \begin{itemize}
-    \item Predictability
-    \item Temporal isolation
-  \end{itemize}
-\end{frame}
-
-\begin{frame}
-  \frametitle{Todo}
-  
   \begin{tikzpicture}
-    \tikzdbg
-    \draw (0,0) -- (4,0) -- (4,4) -- (0,4) -- (0,0);
+    % draw time axis
+    \draw[->] (-6.1,1) -- (5,1) node[below,xshift=-0.4cm]{time in ms};
+    \foreach \x in {0,5,10} \draw[line width=1.3pt] (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95);
+    \foreach \x in {0,...,10} {
+      \pgfmathsetmacro{\ms}{int(\x*20)};
+      \draw (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95) node[anchor=north]{\ms};
+    }
+    \foreach \x in {0,...,12} {
+      \draw[thin, gray, dashed] (-6+\x*\taskunit,1) -- (-6+\x*\taskunit,4);
+    }
+
+    % draw the task labels
+    \begin{scope}[anchor=south east, rectangle, xshift=-6cm, minimum height=\taskheight]
+      \node[yshift=1.5cm, label=west:{web (10/200)}] {};
+      \node[yshift=2.5cm, label=west:{UI (10/40)}] {};
+      \node[yshift=3.5cm, label=west:{brew (40/100)}] {};
+    \end{scope}
+
+    % draw the tasks
+    \begin{scope}[xshift=-6cm, yshift=1.5cm]
+      \clip (-0.2,0) rectangle (11,3);
+
+      \begin{scope}
+        \task{inactive}{web}{0}{3};
+        \task{active}{web}{3}{0.5};
+        \task{inactive}{web}{10}{3};
+        \taskstart;
+        \period{10};
+      \end{scope}
+
+      \begin{scope}[yshift=1cm]
+        \foreach \t in {0,2,...,12} \task{active}{ui}{\t}{0.5};
+        \taskstart;
+        \foreach \d in {2,4,...,12} \period{\d};
+      \end{scope}
+
+      \begin{scope}[yshift=2cm]
+        \task{inactive}{brew}{0}{0.5};
+        \task{active}{brew}{0.5}{1.5};
+        \task{inactive}{brew}{2}{0.5};
+        \task{active}{brew}{2.5}{0.5};
+        \task{active}{brew}{5}{1};
+        \task{inactive}{brew}{6}{0.5};
+        \task{active}{brew}{6.5}{1};
+        \task{inactive}{brew}{10}{0.5};
+        \task{active}{brew}{10.5}{1.5};
+        \task{inactive}{brew}{12}{0.5};
+        \taskstart;
+        \foreach \d in {5,10} \period{\d};
+      \end{scope}
+    \end{scope}
+
+  
   \end{tikzpicture}
 \end{frame}
 
+\begin{frame}\frametitle{Related Work}
+  \begin{itemize}
+    \item Linux/RK: resource reservation, CPU (fixed priority) and disk (EDF)
+    \item SCHED\_SPORADIC: priority based, aimed for inclusion in mainline but failed
+    \item OCERA: resource-reservation based scheduler, as loadable kernel module
+    \item LITMUS\textsuperscript{RT}: real-time scheduling testbed, not aiming to be
+      production quality
+    \item ExShed: kernel extension to allow scheduler implementation in user space
+    \item Linux modular scheduling framework
+  \end{itemize}
+
+  \vspace{0.5cm}
+
+  \begin{center}
+    \begin{tikzpicture}
+      \node[draw,rectangle,anchor=east] (rt) at (-0.5,3.5) {sched/rt.c};
+      \node[draw,rectangle,anchor=east] (fair) at (-3,2.0) {sched/fair.c};
+      \draw[thick,->] (0,0.0) -- (5.3,4) node[midway,right=0.7cm,yshift=-0.3cm]{priority};
+      \begin{scope}[xshift=-1.9cm, yshift=1cm]
+        \node[anchor=west] (rr) at (4,2.8) {\small SCHED\_RR};
+        \node[anchor=west] (fifo) at (3,2.1) {\small SCHED\_FIFO};
+        \node[anchor=west] (other) at (2,1.4) {\small SCHED\_OTHER};
+        \node[anchor=west] (idle) at (1,0.7) {\small SCHED\_IDLE};
+        \node[anchor=west] (batch) at (0,0) {\small SCHED\_BATCH};
+      \end{scope}
+
+      \draw (rt) -- (rr);
+      \draw (rt) -- (fifo);
+      \draw (fair) -- (other);
+      \draw (fair) -- (idle);
+      \draw (fair) -- (batch);
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+\begin{frame}\frametitle{Real-time Tasks}
+  Properties of real-time tasks: \textit{runtime}, \textit{deadline} and \textit{period}
+
+  For our coffee machine:
+
+  \begin{tikzpicture}
+    % draw time axis
+    \draw[->] (-6.1,1) -- (5,1) node[below,xshift=-0.4cm]{time in ms};
+    \foreach \x in {0,5,10} \draw[line width=1.3pt] (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95);
+    \foreach \x in {0,...,10} {
+      \pgfmathsetmacro{\ms}{int(\x*20)};
+      \draw (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95) node[anchor=north]{\ms};
+    }
+    \foreach \x in {0,...,12} {
+      \draw[thin, gray, dashed] (-6+\x*\taskunit,1) -- (-6+\x*\taskunit,4);
+    }
+
+    % draw the task labels
+    \begin{scope}[anchor=south east, rectangle, xshift=-6cm, minimum height=\taskheight]
+      \node[yshift=1.5cm, label=west:{web (10/200)}] {};
+      \node[yshift=2.5cm, label=west:{UI (10/40)}] {};
+      \node[yshift=3.5cm, label=west:{brew (40/100)}] {};
+    \end{scope}
+
+    % draw the tasks
+    \begin{scope}[xshift=-6cm, yshift=1.5cm]
+      \clip (-0.2,0) rectangle (11,3);
+      \alt<2->{
+        \clip (-0.2,0) rectangle (5.9*\taskunit,3);
+      }{
+        \clip (-0.2,0) rectangle (3,3);
+      }
+
+      \begin{scope}
+        \alt<2->{
+          \task{inactive}{web}{0}{6};
+        }{
+          \task{inactive}{web}{0}{3};
+          \task{active}{web}{3}{0.5};
+        }
+        \taskstart;
+      \end{scope}
+
+      \begin{scope}[yshift=1cm]
+        \only<2->{
+          \task{active}{ui}{0}{1.5};
+          \task{active}{ui}{2}{1.5};
+        }
+        \foreach \t in {0,2,...,6} \task{active}{ui}{\t}{0.5};
+        \taskstart;
+        \foreach \d in {2,4,...,6} \period{\d};
+      \end{scope}
+
+      \begin{scope}[yshift=2cm]
+        \alt<2->{
+          \task{inactive}{brew}{0}{1.5};
+          \task{active}{brew}{1.5}{0.5};
+          \task{inactive}{brew}{2}{1.5};
+          \task{active}{brew}{3.5}{0.5};
+          \task{inactive}{brew}{4}{0.5};
+          \task{active}{brew}{4.5}{1};
+        }{
+          \task{inactive}{brew}{0}{0.5};
+          \task{active}{brew}{0.5}{1.5};
+          \task{inactive}{brew}{2}{0.5};
+          \task{active}{brew}{2.5}{0.5};
+        }
+        \taskstart;
+        \foreach \d in {5} \period{\d};
+      \end{scope}
+    \end{scope}
+
+  
+    % draw text
+    \draw[<-,uncover=<3->, thick] (5.6*\taskunit-6,3.75) -- (7*\taskunit-6,4.3) node[right, starburst, draw=red, fill=orange!60!white, align=center] {deadline \\ miss!};
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}\frametitle{Algorithm}
+  For each Task ($Q_i$ / $T_i$), keep track of:
+  \begin{itemize}
+  \item budget (remaining runtime) $q_i$ and
+  \item scheduling deadline $d_i$
+  \end{itemize}
+  When a task wakes up:
+  \begin{itemize}
+    \item set new deadline $d_i = t + T_i$ and recharge budget if $q_i < (d_i - t_i) \frac{Q_i}{T_i}$
+    \item pick task with earliest deadline and run it
+    \item while running, decrease budget according to runtime
+    \item if budget reaches zero, task is throttled until recharging happens at time $d_i$
+  \end{itemize}
+  In single-CPU case, all deadlines are hit if sum of $Q_i / T_I$
+  is less than 1
+\end{frame}
+
+\begin{frame}\frametitle{Example}
+  \begin{center}
+    \begin{tabular}{rccc}
+      {}       & brew & UI & web \\
+      budget   & \alt<4>{0}{\alt<3->{{\alert<3>{10}}}{40}}  & \alt<4->{0}{\alt<3->{\alert<3>{10}}{\alt<2->{\alert<2>{0}}{10}}} & \alt<4->{0}{10}  \\
+      deadline & 100  & \alt<3->{\alert<3>{80}}{40} & 200 \\
+    \end{tabular}
+  \end{center}
+
+  \begin{tikzpicture}
+    % draw time axis
+    \draw[->] (-6.1,1) -- (5,1) node[below,xshift=-0.4cm]{time in ms};
+    \foreach \x in {0,5,10} \draw[line width=1.3pt] (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95);
+    \foreach \x in {0,...,10} {
+      \pgfmathsetmacro{\ms}{int(\x*20)};
+      \draw (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95) node[anchor=north]{\ms};
+    }
+    \foreach \x in {0,...,12} {
+      \draw[thin, gray, dashed] (-6+\x*\taskunit,1) -- (-6+\x*\taskunit,4);
+    }
+
+    % draw the task labels
+    \begin{scope}[anchor=south east, rectangle, xshift=-6cm, minimum height=\taskheight]
+      \node[yshift=1.5cm, label=west:{web (10/200)}] {};
+      \node[yshift=2.5cm, label=west:{UI (10/40)}] {};
+      \node[yshift=3.5cm, label=west:{brew (40/100)}] {};
+    \end{scope}
+
+    \begin{scope}[xshift=-6cm, yshift=1.5cm]
+      \taskstart;
+      \period{10};
+    \end{scope}
+    \begin{scope}[xshift=-6cm, yshift=2.5cm]
+      \taskstart;
+      \period{2};
+      \only<3->{\period{4}};
+    \end{scope}
+    \begin{scope}[xshift=-6cm, yshift=3.5cm]
+      \taskstart;
+      \period{5};
+    \end{scope}
+
+    % draw the tasks
+    \begin{scope}[xshift=-6cm, yshift=1.5cm]1
+      \only<1>{
+        \clip (-0.2,0) rectangle (-0.2,3);
+      }
+      \only<2>{
+        \clip (-0.2,0) rectangle (0.5*\taskunit,3);
+      }
+      \only<3>{
+        \clip (-0.2,0) rectangle (2*\taskunit,3);
+      }
+      \only<4>{
+        \clip (-0.2,0) rectangle (4*\taskunit,3);
+      }
+
+      \begin{scope}
+        \task{inactive}{web}{0}{3};
+        \task{active}{web}{3}{0.5};
+        \task{inactive}{web}{10}{3};
+        \taskstart;
+        \period{10};
+      \end{scope}
+
+      \begin{scope}[yshift=1cm]
+        \foreach \t in {0,2,...,12} \task{active}{ui}{\t}{0.5};
+        \taskstart;
+        \foreach \d in {2,4,...,12} \period{\d};
+      \end{scope}
+
+      \begin{scope}[yshift=2cm]
+        \task{inactive}{brew}{0}{0.5};
+        \task{active}{brew}{0.5}{1.5};
+        \task{inactive}{brew}{2}{0.5};
+        \task{active}{brew}{2.5}{0.5};
+        \task{active}{brew}{5}{1};
+        \task{inactive}{brew}{6}{0.5};
+        \task{active}{brew}{6.5}{1};
+        \task{inactive}{brew}{10}{0.5};
+        \task{active}{brew}{10.5}{1.5};
+        \task{inactive}{brew}{12}{0.5};
+        \taskstart;
+        \foreach \d in {5,10} \period{\d};
+      \end{scope}
+    \end{scope}
+
+    \begin{scope}[xshift=-6cm,hidden]
+      \draw[blue] (3.75*\taskunit,0) node[below] {brew wakes up} -- (3.75*\taskunit, 4);
+    \end{scope}
+  
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}\frametitle{Example 2}
+  \begin{center}
+    \begin{tabular}{rccc}
+      {}       & brew & UI & web \\
+      budget   & \only<1,3>{40}\only<2>{0}  & \only<1>{0}\only<2->{10} & 0   \\
+      deadline & \only<-2>{115}\only<3>{180}& \only<1>{80}\only<2->{120} & 200
+    \end{tabular}
+  \end{center}
+  
+  \begin{tikzpicture}
+    % draw time axis
+    \draw[->] (-6.1,1) -- (5,1) node[below,xshift=-0.4cm]{time in ms};
+    \foreach \x in {0,5,10} \draw[line width=1.3pt] (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95);
+    \foreach \x in {0,...,10} {
+      \pgfmathsetmacro{\ms}{int(\x*20)};
+      \draw (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95) node[anchor=north]{\ms};
+    }
+    \foreach \x in {0,...,12} {
+      \draw[thin, gray, dashed] (-6+\x*\taskunit,1) -- (-6+\x*\taskunit,4);
+    }
+
+    \draw[<-,uncover=<2>, thick] (6.3*\taskunit-6,2.75) -- (7*\taskunit-6,3.3) node[right, starburst, draw=red, fill=orange!60!white, align=center] {deadline \\ miss!};
+
+    % draw the task labels
+    \begin{scope}[anchor=south east, rectangle, xshift=-6cm, minimum height=\taskheight]
+      \node[yshift=1.5cm, label=west:{web (10/200)}] {};
+      \node[yshift=2.5cm, label=west:{UI (10/40)}] {};
+      \node[yshift=3.5cm, label=west:{brew (40/115)}] {};
+    \end{scope}
+
+    \begin{scope}[xshift=-6cm]
+      \draw[blue] (3.75*\taskunit,0) node[below] {brew wakes up} -- (3.75*\taskunit, 4);
+    \end{scope}
+    
+    \begin{scope}[xshift=-6cm, yshift=1.5cm]
+      \period{10};
+    \end{scope} 
+    \begin{scope}[xshift=-6cm, yshift=2.5cm]
+      \period{4};
+    \end{scope} 
+    \begin{scope}[xshift=-6cm, yshift=3.5cm]
+      \only<-2>{\period{5.75};}
+      \only<3>{\period{9};}
+    \end{scope} 
+    
+    % draw the tasks
+    \begin{scope}[xshift=-6cm, yshift=1.5cm]
+      \alt<2->{
+        \clip (-0.2,0) rectangle (7*\taskunit,3);
+      }{
+        \clip (-0.2,0) rectangle (3.72*\taskunit,3);
+      }
+
+      \begin{scope}
+        \task{inactive}{web}{0}{0.5};
+        \task{active}{web}{0.5}{0.5};
+        \task{inactive}{web}{10}{3};
+        \taskstart;
+        \period{10};
+      \end{scope}
+
+      \begin{scope}[yshift=1cm]
+        \foreach \t in {0,2} \task{active}{ui}{\t}{0.5};
+        \only<2>{\task{active}{ui}{5.75}{0.5};}
+        \only<3>{\task{active}{ui}{4}{0.5};}
+        \taskstart;
+        \foreach \d in {2,4,6} \period{\d};
+      \end{scope}
+
+      \begin{scope}[yshift=2cm]
+        \only<2>{\task{active}{brew}{3.75}{2}};
+        \only<3>{\task{active}{brew}{3.75}{0.25}};
+        \only<3>{\task{inactive}{brew}{4}{0.5}};
+        \only<3>{\task{active}{brew}{4.5}{1.75}};
+        \taskstart;
+        \only<2>{
+          \foreach \d in {5.75,11.5} \period{\d};
+        }
+      \end{scope}
+    \end{scope}
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}[fragile]\frametitle{API, multicore, shared resources}
+  User level API: two new syscalls \verb|sched_setattr| and \verb|sched_getattr| \\
+  \vspace{1cm}
+  Shared resources: inherit deadline of blocked task \\
+  \vspace{1cm}
+  Multicore: partitioned (via cpuset) and global supported \\
+\end{frame}
+
+
 \section{Evaluation}
 
-\begin{frame}\frametitle{Synthetic workload}
+\begin{frame}\frametitle{Synthetic workload (partitioned)}
+  \begin{tabular}{cccc}
+    \textbf{U(\%)} & \textbf{SCHED\_DEADLINE(\%)} & \textbf{SCHED\_FIFO(\%)} & \textbf{SCHED\_OTHER(\%)} \\
+    60 & 0 & 0 & 0.58 \\
+    70 & 0 & 0 & 1.87 \\
+    80 & 0 & 0.003 & 6.03 \\
+    90 & 0 & 0.38 & 10.20 
+  \end{tabular}
+\end{frame}
+
+\begin{frame}\frametitle{Synthetic workload (global, six cores)}
+  \begin{tabular}{cccc}
+    \textbf{U(\%)} & \textbf{SCHED\_DEADLINE(\%)} & \textbf{SCHED\_FIFO(\%)} & \textbf{SCHED\_OTHER(\%)} \\
+    500 & 0.027 & 0.001 & 3.303 \\
+    510 & 0.023 & 0.002 & 4.310 \\
+    520 & 0.051 & 0.011 & 4.992 \\
+    530 & 0.099 & 0.023 & 6.046 \\
+    540 & 0.138 & 0.230 & 7.093 \\
+    550 & 0.239 & 0.271 & 8.097 \\
+    560 & 0.289 & 0.380 & 9.977 \\
+    570 & 0.351 & 0.640 & 11.554 \\
+    580 & 0.618 & 1.380 & 15.384 \\
+    590 & 1.295 & 2.535 & 19.774 
+  \end{tabular}
 \end{frame}
 
 \begin{frame}\frametitle{MPlayer on loaded system}
@@ -110,7 +509,19 @@
 \end{frame}
 
 \begin{frame}\frametitle{Virtual router}
-  
+  {\Huge \alert{TODO}}
+\end{frame}
+
+\begin{frame}\frametitle{Limit vcpu thread}
+  \begin{center}
+    \input{./vr-vcpu.tex}
+  \end{center}
+\end{frame}
+
+\begin{frame}\frametitle{Limit vhost-net thread}
+  \begin{center}
+    \input{./vr-vhost-net.tex}
+  \end{center}
 \end{frame}
 
 \begin{frame}
