@@ -2,7 +2,6 @@
 
 \usetheme{metropolis}
 
-
 \usepackage{appendixnumberbeamer}
 \usepackage{tikz}
 \usepackage[absolute,overlay]{textpos}
@@ -12,6 +11,9 @@
 \usetikzlibrary{patterns}
 \usetikzlibrary{shapes}
 \usetikzlibrary{shapes.symbols}
+\usetikzlibrary{fit}
+\usetikzlibrary{backgrounds}
+\usetikzlibrary{calc}
 
 \newcommand{\tikzdbg}{%
   \draw[step=1,color=lightgray] (-7,0) grid (7,7);%
@@ -25,6 +27,8 @@
 \author{Benno Fünfstück}
 
 \begin{document}
+
+%\includeonlyframes{current}
 
 \pgfmathsetmacro{\taskheight}{0.4cm}
 \pgfmathsetmacro{\taskunit}{0.9}
@@ -508,8 +512,25 @@
   \end{center}
 \end{frame}
 
-\begin{frame}\frametitle{Virtual router}
-  {\Huge \alert{TODO}}
+\begin{frame}[label=current]\frametitle{Virtual router}
+  \begin{center}
+    \begin{tikzpicture}
+      \begin{scope}[rectangle, inner sep=0.3cm]
+        \node[draw, anchor=west] (vhost) {vhost-net};
+        \node[draw, anchor=west, align=left] (vm) at (0,2) {Quagga \\ vCPU};
+        \node[draw, anchor=west] (nic) at (2.5,0) {NIC};
+        \draw[<->] (vhost) to (vm);
+        \draw[<->] (vhost) to (nic);
+        \draw[<-] (nic) to (7,0) node[above left, align=left] {64 byte \\ UDP packets};
+        \draw[->] (nic) to (3,-2) node[left] {Output packet rate};
+      \end{scope}
+
+      \begin{scope}[on background layer]
+        \node[fill=black!10, fit=(vhost) (nic), draw, rectangle, inner sep=0.6cm, yshift=-0.2cm] (kernel){};
+        \node[above right=0.1cm] at (kernel.south west) {Linux kernel};
+      \end{scope}
+    \end{tikzpicture} 
+  \end{center}
 \end{frame}
 
 \begin{frame}\frametitle{Limit vcpu thread}
