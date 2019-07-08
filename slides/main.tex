@@ -62,8 +62,6 @@
 
 \maketitle
 
-\section{Introduction}
-
 \begin{frame}\frametitle{Story: A new coffee machine}
   \vspace{1cm}
   \begin{columns}
@@ -77,7 +75,10 @@
       \item User interface controller
       \item Web interface
       \end{itemize}
-      \vspace{1cm}
+      \vspace{0.5cm}
+      \pause
+      {\Large $\Rightarrow$ real-time tasks} \\
+      (guaranteed worst-case response time)
     \end{column}
   \end{columns}
 \end{frame}
@@ -101,8 +102,91 @@
 
 \section{Design of a realtime scheduler}
 
+% \begin{frame}\frametitle{Real-time Tasks}
+%   Properties of real-time tasks: \textit{runtime}, \textit{deadline} and \textit{period}
+
+%   For our coffee machine:
+
+%   \begin{tikzpicture}
+%     % draw time axis
+%     \draw[->] (-6.1,1) -- (5,1) node[below,xshift=-0.4cm]{time in ms};
+%     \foreach \x in {0,5,10} \draw[line width=1.3pt] (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95);
+%     \foreach \x in {0,...,10} {
+%       \pgfmathsetmacro{\ms}{int(\x*20)};
+%       \draw (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95) node[anchor=north]{\ms};
+%     }
+%     \foreach \x in {0,...,12} {
+%       \draw[thin, gray, dashed] (-6+\x*\taskunit,1) -- (-6+\x*\taskunit,4);
+%     }
+
+%     % draw the task labels
+%     \begin{scope}[anchor=south east, rectangle, xshift=-6cm, minimum height=\taskheight]
+%       \node[yshift=1.5cm, label=west:{web (10/200)}] {};
+%       \node[yshift=2.5cm, label=west:{UI (10/40)}] {};
+%       \node[yshift=3.5cm, label=west:{brew (40/100)}] {};
+%     \end{scope}
+
+%     % draw the tasks
+%     \begin{scope}[xshift=-6cm, yshift=1.5cm]
+%       \clip (-0.2,0) rectangle (11,3);
+
+%       \begin{scope}
+%         \task{inactive}{web}{0}{3};
+%         \task{active}{web}{3}{0.5};
+%         \task{inactive}{web}{10}{3};
+%         \taskstart;
+%         \period{10};
+%       \end{scope}
+
+%       \begin{scope}[yshift=1cm]
+%         \foreach \t in {0,2,...,12} \task{active}{ui}{\t}{0.5};
+%         \taskstart;
+%         \foreach \d in {2,4,...,12} \period{\d};
+%       \end{scope}
+
+%       \begin{scope}[yshift=2cm]
+%         \task{inactive}{brew}{0}{0.5};
+%         \task{active}{brew}{0.5}{1.5};
+%         \task{inactive}{brew}{2}{0.5};
+%         \task{active}{brew}{2.5}{0.5};
+%         \task{active}{brew}{5}{1};
+%         \task{inactive}{brew}{6}{0.5};
+%         \task{active}{brew}{6.5}{1};
+%         \task{inactive}{brew}{10}{0.5};
+%         \task{active}{brew}{10.5}{1.5};
+%         \task{inactive}{brew}{12}{0.5};
+%         \taskstart;
+%         \foreach \d in {5,10} \period{\d};
+%       \end{scope}
+%     \end{scope}
+%   \end{tikzpicture}
+% \end{frame}
+\begin{frame}\frametitle{Linux modular scheduling framework}
+  Since Linux 2.6.23 \\
+  \begin{center}
+    \begin{tikzpicture}
+      \node[draw,rectangle,anchor=east] (rt) at (-0.5,3.5) {sched/rt.c};
+      \node[draw,rectangle,anchor=east] (fair) at (-3,2.0) {sched/fair.c};
+      \draw[thick,->] (0,0.0) -- (5.3,4) node[midway,right=0.7cm,yshift=-0.3cm]{priority};
+      \begin{scope}[xshift=-1.9cm, yshift=1cm]
+        \node[anchor=west] (rr) at (4,2.8) {\small SCHED\_RR};
+        \node[anchor=west] (fifo) at (3,2.1) {\small SCHED\_FIFO};
+        \node[anchor=west] (other) at (2,1.4) {\small SCHED\_OTHER};
+        \node[anchor=west] (idle) at (1,0.7) {\small SCHED\_IDLE};
+        \node[anchor=west] (batch) at (0,0) {\small SCHED\_BATCH};
+      \end{scope}
+
+      \draw (rt) -- (rr);
+      \draw (rt) -- (fifo);
+      \draw (fair) -- (other);
+      \draw (fair) -- (idle);
+      \draw (fair) -- (batch);
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
 \begin{frame}\frametitle{Real-time Tasks}
-  Properties of real-time tasks: \textit{runtime}, \textit{deadline} and \textit{period}
+  Properties of real-time tasks: \textit{runtime} and \textit{period}
 
   For our coffee machine:
 
@@ -125,7 +209,7 @@
       \node[yshift=3.5cm, label=west:{brew (40/100)}] {};
     \end{scope}
 
-    % draw the tasks
+    \only<1>{
     \begin{scope}[xshift=-6cm, yshift=1.5cm]
       \clip (-0.2,0) rectangle (11,3);
 
@@ -158,75 +242,13 @@
         \foreach \d in {5,10} \period{\d};
       \end{scope}
     \end{scope}
-
-  
-  \end{tikzpicture}
-\end{frame}
-
-\begin{frame}\frametitle{Related Work}
-  \begin{itemize}
-    \item Linux/RK: resource reservation, CPU (fixed priority) and disk (EDF)
-    \item SCHED\_SPORADIC: priority based, aimed for inclusion in mainline but failed
-    \item OCERA: resource-reservation based scheduler, as loadable kernel module
-    \item LITMUS\textsuperscript{RT}: real-time scheduling testbed, not aiming to be
-      production quality
-    \item ExShed: kernel extension to allow scheduler implementation in user space
-    \item Linux modular scheduling framework
-  \end{itemize}
-
-  \vspace{0.5cm}
-
-  \begin{center}
-    \begin{tikzpicture}
-      \node[draw,rectangle,anchor=east] (rt) at (-0.5,3.5) {sched/rt.c};
-      \node[draw,rectangle,anchor=east] (fair) at (-3,2.0) {sched/fair.c};
-      \draw[thick,->] (0,0.0) -- (5.3,4) node[midway,right=0.7cm,yshift=-0.3cm]{priority};
-      \begin{scope}[xshift=-1.9cm, yshift=1cm]
-        \node[anchor=west] (rr) at (4,2.8) {\small SCHED\_RR};
-        \node[anchor=west] (fifo) at (3,2.1) {\small SCHED\_FIFO};
-        \node[anchor=west] (other) at (2,1.4) {\small SCHED\_OTHER};
-        \node[anchor=west] (idle) at (1,0.7) {\small SCHED\_IDLE};
-        \node[anchor=west] (batch) at (0,0) {\small SCHED\_BATCH};
-      \end{scope}
-
-      \draw (rt) -- (rr);
-      \draw (rt) -- (fifo);
-      \draw (fair) -- (other);
-      \draw (fair) -- (idle);
-      \draw (fair) -- (batch);
-    \end{tikzpicture}
-  \end{center}
-\end{frame}
-
-\begin{frame}\frametitle{Real-time Tasks}
-  Properties of real-time tasks: \textit{runtime}, \textit{deadline} and \textit{period}
-
-  For our coffee machine:
-
-  \begin{tikzpicture}
-    % draw time axis
-    \draw[->] (-6.1,1) -- (5,1) node[below,xshift=-0.4cm]{time in ms};
-    \foreach \x in {0,5,10} \draw[line width=1.3pt] (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95);
-    \foreach \x in {0,...,10} {
-      \pgfmathsetmacro{\ms}{int(\x*20)};
-      \draw (-6+\x*\taskunit,1.05) -- (-6+\x*\taskunit,0.95) node[anchor=north]{\ms};
     }
-    \foreach \x in {0,...,12} {
-      \draw[thin, gray, dashed] (-6+\x*\taskunit,1) -- (-6+\x*\taskunit,4);
-    }
-
-    % draw the task labels
-    \begin{scope}[anchor=south east, rectangle, xshift=-6cm, minimum height=\taskheight]
-      \node[yshift=1.5cm, label=west:{web (10/200)}] {};
-      \node[yshift=2.5cm, label=west:{UI (10/40)}] {};
-      \node[yshift=3.5cm, label=west:{brew (40/100)}] {};
-    \end{scope}
 
     % draw the tasks
     \begin{scope}[xshift=-6cm, yshift=1.5cm]
       \clip (-0.2,0) rectangle (11,3);
       \alt<2->{
-        \clip (-0.2,0) rectangle (5.9*\taskunit,3);
+        \clip (-0.2,0) rectangle (12*\taskunit,3);
       }{
         \clip (-0.2,0) rectangle (3,3);
       }
@@ -276,21 +298,16 @@
   \end{tikzpicture}
 \end{frame}
 
-\begin{frame}\frametitle{Algorithm}
-  For each Task ($Q_i$ / $T_i$), keep track of:
+
+\begin{frame}\frametitle{Related Work}
   \begin{itemize}
-  \item budget (remaining runtime) $q_i$ and
-  \item scheduling deadline $d_i$
+  \item Linux/RK: resource reservation, CPU (fixed priority) and disk (EDF)
+  \item OCERA: resource-reservation based scheduler, as loadable kernel module
+  \item LITMUS\textsuperscript{RT}: real-time scheduling testbed, not aiming to be
+    production quality
+  \item ExShed: kernel extension to allow scheduler implementation in user space
+  \item SCHED\_SPORADIC: priority based, aimed for inclusion in mainline but failed
   \end{itemize}
-  When a task wakes up:
-  \begin{itemize}
-    \item set new deadline $d_i = t + T_i$ and recharge budget if $q_i < (d_i - t_i) \frac{Q_i}{T_i}$
-    \item pick task with earliest deadline and run it
-    \item while running, decrease budget according to runtime
-    \item if budget reaches zero, task is throttled until recharging happens at time $d_i$
-  \end{itemize}
-  In single-CPU case, all deadlines are hit if sum of $Q_i / T_I$
-  is less than 1
 \end{frame}
 
 \begin{frame}\frametitle{Example}
@@ -418,7 +435,7 @@
     \end{scope}
 
     \begin{scope}[xshift=-6cm]
-      \draw[blue] (3.75*\taskunit,0) node[below] {brew wakes up} -- (3.75*\taskunit, 4);
+      \draw[blue] (3.75*\taskunit,0) node[below,align=center] {brew wakes up\only<3>{, new deadline generated \\ because $40 > (115 - 75) * (40/115) = 13.9$}} -- (3.75*\taskunit, 4);
     \end{scope}
     
     \begin{scope}[xshift=-6cm, yshift=1.5cm]
@@ -460,10 +477,13 @@
         \only<2>{\task{active}{brew}{3.75}{2}};
         \only<3>{\task{active}{brew}{3.75}{0.25}};
         \only<3>{\task{inactive}{brew}{4}{0.5}};
-        \only<3>{\task{active}{brew}{4.5}{1.75}};
+        \only<3>{\task{active}{brew}{4.5}{0.5}};
         \taskstart;
         \only<2>{
           \foreach \d in {5.75,11.5} \period{\d};
+        }
+        \only<3>{
+          \draw[color=alert!70!white,<-,very thick,dashed] (5.75*\taskunit,0.0) -- +(0,0.6cm);%
         }
       \end{scope}
     \end{scope}
@@ -553,11 +573,11 @@
   \end{tabular}
 \end{frame}
 
-\begin{frame}\frametitle{MPlayer on loaded system}
-  \begin{center}
-    \input{./eval-mplayer-cfs.tex}
-  \end{center}
-\end{frame}
+% \begin{frame}\frametitle{Limit vcpu thread}
+%   \begin{center}
+%     \input{./vr-vcpu.tex}
+%   \end{center}
+% \end{frame}
 
 \begin{frame}[label=current]\frametitle{Virtual router}
   \begin{center}
@@ -577,12 +597,6 @@
         \node[above right=0.1cm] at (kernel.south west) {Linux kernel};
       \end{scope}
     \end{tikzpicture} 
-  \end{center}
-\end{frame}
-
-\begin{frame}\frametitle{Limit vcpu thread}
-  \begin{center}
-    \input{./vr-vcpu.tex}
   \end{center}
 \end{frame}
 
@@ -614,6 +628,31 @@
     \footnotesize{Paper: \textit{Deadline Scheduling in the Linux kernel}\hspace{1cm}
       Presentation: \textit{Benno Fünfstück}}
   \end{textblock*}
+\end{frame}
+
+\appendix
+
+\begin{frame}\frametitle{Algorithm}
+  For each Task ($Q_i$ / $T_i$), keep track of:
+  \begin{itemize}
+  \item budget (remaining runtime) $q_i$ and
+  \item scheduling deadline $d_i$
+  \end{itemize}
+  When a task wakes up:
+  \begin{itemize}
+  \item if $q_i \geq (d_i - t_i) ({Q_i} / {T_i})$, recharge budget and set new deadline (one period)
+  \end{itemize}
+
+  Always run task with earliest deadline, decrease budget accordingly
+
+  In single-CPU case, all deadlines are hit if sum of $Q_i / T_I$
+  is less than 1
+\end{frame}
+
+\begin{frame}\frametitle{MPlayer on loaded system}
+  \begin{center}
+    \input{./eval-mplayer-cfs.tex}
+  \end{center}
 \end{frame}
 
 \end{document}
